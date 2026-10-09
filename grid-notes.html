@@ -1,0 +1,1178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light" />
+<meta name="theme-color" content="#0f172a" />
+<title>Grid Notes — write on the grid, square by square</title>
+<meta name="description" content="A notebook of white pages covered in tiny squares. Drag across the squares to mark a writing area — horizontal or vertical — then type. Everything is saved in this browser." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cg stroke='%23334155'%3E%3Cpath d='M12 12h40M12 20h40M12 28h40M12 36h40M12 44h40M12 52h40M12 12v40M20 12v40M28 12v40M36 12v40M44 12v40M52 12v40'/%3E%3C/g%3E%3Cg fill='%2360a5fa'%3E%3Crect x='12' y='12' width='16' height='8' rx='1.5'/%3E%3Crect x='36' y='28' width='8' height='16' rx='1.5' opacity='.8'/%3E%3Crect x='28' y='36' width='8' height='8' rx='1.5' opacity='.65'/%3E%3C/g%3E%3Crect x='12' y='48' width='32' height='4' rx='1.5' fill='%23fbbf24'/%3E%3C/svg%3E" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --cell: 16px;
+    color-scheme: light;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input, select, textarea { font: inherit; color: inherit; }
+  code, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ---------- shell ---------- */
+  #app { display: flex; height: 100dvh; overflow: hidden; }
+  #sidebar {
+    width: 288px; flex: none; display: flex; flex-direction: column;
+    background: #fff; border-right: 1px solid #e2e8f0;
+    transition: transform .2s ease;
+  }
+  #main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  @media (max-width: 1023px) {
+    #sidebar { position: fixed; inset: 0 auto 0 0; z-index: 40; transform: translateX(-100%); box-shadow: 0 20px 40px -20px rgba(15,23,42,.4); }
+    #sidebar.open { transform: translateX(0); }
+    #scrim { position: fixed; inset: 0; z-index: 30; background: rgba(15,23,42,.4); backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity .2s; }
+    #scrim.show { opacity: 1; pointer-events: auto; }
+  }
+  @media (min-width: 1024px) { #scrim { display: none; } #menu-btn { display: none; } }
+
+  /* ---------- sidebar ---------- */
+  .sb-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
+  .logo { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #0f172a; color: #fff; font-weight: 700; }
+  .sb-title { font-size: 13px; font-weight: 600; line-height: 1.2; }
+  .sb-sub { font-size: 11px; color: #64748b; }
+  .sb-search { padding: 12px; }
+  .sb-search input {
+    width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px;
+    background: #f8fafc; font-size: 13px; outline: none;
+  }
+  .sb-search input:focus { border-color: #94a3b8; background: #fff; }
+  .sb-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 16px; }
+  .sb-body::-webkit-scrollbar { width: 10px; }
+  .sb-body::-webkit-scrollbar-thumb { background: rgba(15,23,42,.18); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+  .group { margin-bottom: 16px; }
+  .group-head { display: flex; align-items: center; gap: 6px; padding: 4px; }
+  .dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+  .group-name { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #64748b; }
+  .group-count { font-size: 11px; color: #94a3b8; }
+  .group-add { margin-left: auto; display: none; border: 0; background: transparent; color: #94a3b8; border-radius: 4px; padding: 0 4px; font-size: 13px; }
+  .group:hover .group-add { display: block; }
+  .group-add:hover { background: #f1f5f9; color: #0f172a; }
+  .page-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .page-btn {
+    position: relative; width: 100%; display: flex; align-items: center; gap: 8px;
+    border: 0; background: transparent; border-radius: 6px; padding: 6px 8px; text-align: left;
+    font-size: 13px; color: #334155; transition: background .15s;
+  }
+  .page-btn:hover { background: #f1f5f9; }
+  .page-btn.active { background: #0f172a; color: #fff; }
+  .page-btn .label { min-width: 0; flex: 1; }
+  .page-btn .label b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .page-btn .label span { display: block; font-size: 10px; opacity: .65; }
+  .page-del { position: absolute; right: 6px; top: 6px; display: none; border: 0; background: transparent; color: #94a3b8; font-size: 10px; border-radius: 4px; padding: 2px 4px; }
+  .page-btn:hover .page-del { display: block; }
+  .page-del:hover { background: #fff; color: #dc2626; }
+  .sb-sections { border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 4px; }
+  .sb-h { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #64748b; padding: 0 4px 8px; }
+  .cat-row { display: flex; align-items: center; gap: 8px; padding: 4px; border-radius: 6px; }
+  .cat-row:hover { background: #f8fafc; }
+  .cat-name { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; border: 0; background: transparent; padding: 2px 0; }
+  .cat-actions { display: none; gap: 2px; }
+  .cat-row:hover .cat-actions { display: flex; }
+  .mini { border: 0; background: transparent; color: #94a3b8; border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+  .mini:hover { background: #f1f5f9; color: #0f172a; }
+  .mini.danger:hover { background: #fef2f2; color: #dc2626; }
+  .add-form { display: flex; gap: 6px; margin-top: 8px; }
+  .add-form input { flex: 1; min-width: 0; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 8px; font-size: 13px; outline: none; }
+  .add-form input:focus { border-color: #94a3b8; }
+  .add-form button { border: 0; background: #0f172a; color: #fff; border-radius: 6px; padding: 6px 10px; font-size: 13px; font-weight: 500; }
+  .add-form button:hover { background: #334155; }
+  .sb-foot { border-top: 1px solid #e2e8f0; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .btn { border-radius: 8px; padding: 9px 12px; font-size: 13px; font-weight: 600; border: 1px solid #e2e8f0; background: #fff; transition: background .15s; }
+  .btn:hover { background: #f8fafc; }
+  .btn.primary { border-color: transparent; background: #2563eb; color: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+  .btn.primary:hover { background: #1d4ed8; }
+  .btn-row { display: flex; gap: 6px; }
+  .btn-row .btn { flex: 1; padding: 7px 8px; font-size: 12px; font-weight: 500; }
+  .hint { font-size: 11px; color: #94a3b8; line-height: 1.5; margin: 0; }
+
+  /* ---------- toolbar ---------- */
+  #topbar { border-bottom: 1px solid #e2e8f0; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); }
+  .row1 { display: flex; align-items: center; gap: 8px; padding: 8px 12px; flex-wrap: wrap; }
+  #title-input { flex: 1; min-width: 120px; border: 1px solid transparent; border-radius: 6px; padding: 6px 8px; font-size: 15px; font-weight: 600; background: transparent; outline: none; }
+  #title-input:hover { border-color: #e2e8f0; }
+  #title-input:focus { border-color: #cbd5e1; background: #fff; }
+  select.sel { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; padding: 6px 8px; font-size: 13px; outline: none; }
+  #status { border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 500; background: #ecfdf5; color: #047857; white-space: nowrap; }
+  #status.saving { background: #fffbeb; color: #b45309; }
+  #status.error { background: #fef2f2; color: #b91c1c; }
+  .pager { display: flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+  .pager button { border: 0; background: #fff; padding: 6px 9px; font-size: 13px; }
+  .pager button:hover { background: #f8fafc; }
+  .pager span { padding: 0 8px; font-size: 12px; color: #64748b; }
+  .row2 { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-top: 1px solid #f1f5f9; padding: 8px 12px; }
+  .tool { display: flex; align-items: center; gap: 5px; }
+  .tool > label { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #94a3b8; }
+  .swatch { width: 20px; height: 20px; border-radius: 999px; border: 2px solid #fff; box-shadow: 0 0 0 1px #e2e8f0; padding: 0; }
+  .swatch[aria-pressed="true"] { border-color: #0f172a; transform: scale(1.1); }
+  .seg { display: flex; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; background: #fff; padding: 5px 9px; font-size: 12px; }
+  .seg button:hover { background: #f8fafc; }
+  .seg button[aria-pressed="true"] { background: #0f172a; color: #fff; }
+  .tbtn { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; padding: 5px 9px; font-size: 12px; }
+  .tbtn:hover { background: #f8fafc; }
+  .tbtn:disabled { opacity: .4; cursor: default; }
+  .tbtn.danger { border-color: #fecaca; color: #dc2626; }
+  .tbtn.danger:hover { background: #fef2f2; }
+  .spacer { margin-left: auto; }
+
+  #tip { display: flex; gap: 8px; align-items: flex-start; border-bottom: 1px solid #dbeafe; background: #eff6ff; padding: 8px 12px; font-size: 12px; color: #1e3a8a; }
+  #tip b { flex: none; }
+  #tip button { margin-left: auto; border: 0; background: transparent; color: #3b82f6; border-radius: 4px; padding: 0 4px; }
+  #tip button:hover { background: #dbeafe; }
+
+  /* ---------- paper ---------- */
+  #scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
+  @media (min-width: 640px) { #scroll { padding: 24px; } }
+  #sheet { margin: 0 auto; }
+  #sheet-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 11px; color: #64748b; }
+  .paper {
+    position: relative; background: #fff; border-radius: 3px;
+    padding: calc(var(--cell) * 1.5);
+    box-shadow: 0 1px 2px rgba(15,23,42,.08), 0 18px 40px -18px rgba(15,23,42,.35), 0 0 0 1px rgba(15,23,42,.06);
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #grid { position: relative; }
+  #grid.grid-on {
+    background-image:
+      linear-gradient(to right, rgba(15,23,42,.16) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15,23,42,.16) 1px, transparent 1px),
+      linear-gradient(to right, rgba(37,99,235,.20) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(37,99,235,.20) 1px, transparent 1px);
+    background-size:
+      var(--cell) var(--cell),
+      var(--cell) var(--cell),
+      calc(var(--cell) * 5) calc(var(--cell) * 5),
+      calc(var(--cell) * 5) calc(var(--cell) * 5);
+  }
+  #foot-note { margin-top: 12px; text-align: center; font-size: 11px; color: #94a3b8; }
+
+  /* ---------- writing areas ---------- */
+  .area { position: absolute; }
+  .area textarea {
+    width: 100%; height: 100%; margin: 0; border: 0; resize: none; overflow: hidden;
+    background: transparent; border-radius: 2px; padding: .12em .3em;
+    line-height: 1.55; font-weight: 500; outline: none; user-select: text; -webkit-user-select: text;
+  }
+  .area.selected { z-index: 30; }
+  .area .ring { position: absolute; inset: -1px; border-radius: 2px; box-shadow: 0 0 0 2px #3b82f6; pointer-events: none; display: none; }
+  .area.selected .ring { display: block; }
+  .area .tools {
+    position: absolute; left: 0; display: none; align-items: center; gap: 2px;
+    background: rgba(255,255,255,.96); border: 1px solid #e2e8f0; border-radius: 6px;
+    padding: 2px; box-shadow: 0 4px 12px -4px rgba(15,23,42,.25); font-size: 11px;
+  }
+  .area.selected .tools { display: flex; }
+  .area .tools.below { top: 100%; margin-top: 4px; }
+  .area .tools.above { bottom: 100%; margin-bottom: 4px; }
+  .area .tools button { min-width: 20px; border: 0; background: transparent; border-radius: 4px; padding: 2px 4px; font-size: 10px; font-weight: 600; color: #475569; }
+  .area .tools button:hover { background: #f1f5f9; color: #0f172a; }
+  .area .tools .sep { width: 1px; height: 14px; background: #e2e8f0; margin: 0 2px; }
+  .area .grip { position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px; border-radius: 999px; background: #2563eb; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(15,23,42,.3); display: none; cursor: nwse-resize; z-index: 40; }
+  .area.selected .grip { display: block; }
+
+  #marquee { position: absolute; z-index: 40; border: 1px dashed #3b82f6; background: rgba(59,130,246,.15); pointer-events: none; display: none; }
+  #marquee-label { position: absolute; z-index: 40; transform: translateY(-100%); background: #2563eb; color: #fff; font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 4px; white-space: nowrap; pointer-events: none; display: none; }
+
+  #empty { display: grid; place-items: center; height: 100%; }
+  .empty-card { max-width: 340px; text-align: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+  .empty-card h2 { margin: 0 0 6px; font-size: 18px; }
+  .empty-card p { margin: 0 0 16px; font-size: 13px; color: #64748b; }
+
+  .no-print { }
+  @media print {
+    .no-print { display: none !important; }
+    html, body { background: #fff; height: auto; }
+    #app { display: block; height: auto; }
+    #main { display: block; }
+    #scroll { overflow: visible; padding: 0; }
+    .paper { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="scrim" class="no-print"></div>
+
+  <aside id="sidebar" class="no-print">
+    <div class="sb-head">
+      <div class="logo">▦</div>
+      <div>
+        <div class="sb-title">Grid Notes</div>
+        <div class="sb-sub">44 × 60 tiny squares per page</div>
+      </div>
+      <button class="mini" id="close-sb" style="margin-left:auto" aria-label="Close page list">✕</button>
+    </div>
+
+    <div class="sb-search">
+      <input id="search" type="search" placeholder="Search every page…" autocomplete="off" />
+    </div>
+
+    <div class="sb-body" id="sb-body"></div>
+
+    <div class="sb-foot">
+      <button class="btn primary" id="new-page">+ New page</button>
+      <div class="btn-row">
+        <button class="btn" id="export-btn" title="Download all your pages as a JSON backup">Export</button>
+        <button class="btn" id="import-btn" title="Restore pages from a JSON backup">Import</button>
+        <button class="btn" id="print-btn" title="Print or save this page as PDF">Print</button>
+      </div>
+      <input type="file" id="import-file" accept="application/json,.json" hidden />
+      <p class="hint">Everything is saved in this browser only. Use <b>Export</b> to keep a backup — the file also opens on any other device.</p>
+    </div>
+  </aside>
+
+  <main id="main">
+    <header id="topbar" class="no-print">
+      <div class="row1">
+        <button class="tbtn" id="menu-btn" aria-label="Open page list">☰</button>
+        <input id="title-input" placeholder="Page title" aria-label="Page title" />
+        <select class="sel" id="category-select" aria-label="Section"></select>
+        <span id="status">Saved in this browser</span>
+        <div class="pager">
+          <button id="prev-page" title="Previous page" aria-label="Previous page">‹</button>
+          <span id="page-indicator">1 / 1</span>
+          <button id="next-page" title="Next page" aria-label="Next page">›</button>
+        </div>
+      </div>
+
+      <div class="row2" id="pen-row">
+        <div class="tool">
+          <label>Ink</label>
+          <span id="ink-swatches" style="display:flex;gap:4px"></span>
+        </div>
+        <div class="tool">
+          <label>Fill</label>
+          <span id="fill-swatches" style="display:flex;gap:4px"></span>
+        </div>
+        <div class="seg" role="group" aria-label="Text size">
+          <button id="font-down" title="Smaller text">A−</button>
+          <button id="font-value" title="Text size in grid squares" style="min-width:28px">14</button>
+          <button id="font-up" title="Bigger text">A+</button>
+        </div>
+        <div class="seg" id="align-seg" role="group" aria-label="Alignment"></div>
+        <button class="tbtn" id="flip-dir" title="Flip between horizontal and vertical writing">Horizontal → Vertical</button>
+        <div class="spacer"></div>
+        <button class="tbtn" id="dup-btn">Duplicate</button>
+        <button class="tbtn danger" id="del-btn">Delete area</button>
+        <button class="tbtn" id="clear-btn">Clear page</button>
+      </div>
+    </header>
+
+    <div id="tip" class="no-print">
+      <b>How to write:</b>
+      <span>Drag across the tiny squares to mark a writing area — sideways for horizontal writing, downwards for a vertical strip. Then just type. Drag again on any empty square for the next note; hold <kbd>Alt</kbd> to start one on top of an existing note.</span>
+      <button id="tip-close" aria-label="Dismiss">✕</button>
+    </div>
+
+    <div id="scroll">
+      <div id="sheet">
+        <div id="sheet-bar" class="no-print">
+          <span id="sheet-info"></span>
+          <span style="display:flex;gap:6px;align-items:center">
+            <button class="tbtn" id="grid-toggle">Hide grid</button>
+            <button class="tbtn" id="zoom-out" aria-label="Zoom out">−</button>
+            <span id="zoom-label" style="width:34px;text-align:center">100%</span>
+            <button class="tbtn" id="zoom-in" aria-label="Zoom in">+</button>
+          </span>
+        </div>
+        <div class="paper">
+          <div id="grid" class="grid-on">
+            <div id="marquee"></div>
+            <div id="marquee-label"></div>
+          </div>
+        </div>
+        <p id="foot-note" class="no-print"></p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<noscript>
+  <div style="padding:40px;text-align:center;font-family:sans-serif">
+    Grid Notes needs JavaScript switched on to draw the grid and save your writing.
+  </div>
+</noscript>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============================ constants ============================ */
+  var GRID_COLS = 44, GRID_ROWS = 60, BASE_CELL = 16, STORAGE_KEY = "grid-notes-standalone-v1";
+  var INK_COLORS = ["#1f2937", "#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#db2777"];
+  var FILL_COLORS = ["transparent", "#fef08a", "#bbf7d0", "#bfdbfe", "#fbcfe8", "#e9d5ff"];
+  var CATEGORY_PALETTE = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6", "#64748b"];
+  var ALIGNS = [["left", "⇤", "Left aligned"], ["center", "↔", "Centred"], ["right", "⇥", "Right aligned"]];
+
+  /* ============================ helpers ============================ */
+  function $(id) { return document.getElementById(id); }
+  function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function uid() { return "b" + Math.random().toString(36).slice(2, 9); }
+
+  function defaultState() {
+    return {
+      categories: [
+        { id: "c1", name: "Inbox", color: "#6366f1" },
+        { id: "c2", name: "Work", color: "#0ea5e9" },
+        { id: "c3", name: "Study", color: "#f59e0b" }
+      ],
+      pages: [],
+      activePageId: null,
+      ui: { ink: "#1f2937", fill: "transparent", fontSize: 14, direction: "horizontal", align: "left", zoom: 1, showGrid: true }
+    };
+  }
+
+  function demoBlocks() {
+    var raw = [
+      { col: 3, row: 2, colSpan: 38, rowSpan: 3, text: "GRID NOTES — every page is a sheet of tiny squares.", ink: "#1f2937", fill: "#fef08a", fontSize: 20, align: "center" },
+      { col: 3, row: 6, colSpan: 18, rowSpan: 9, text: "1. Drag across the tiny squares to mark a writing area.\n\n2. A wide drag writes horizontally, a tall drag writes vertically.\n\n3. Pick 3 squares, 4 squares or 40 — the note snaps to the grid.", ink: "#2563eb" },
+      { col: 24, row: 6, colSpan: 1, rowSpan: 12, text: "Vertical strip: select a single column, many rows down.", ink: "#dc2626", direction: "vertical" },
+      { col: 27, row: 6, colSpan: 14, rowSpan: 4, text: "Small square note", ink: "#059669", fill: "#bbf7d0", align: "center" },
+      { col: 27, row: 12, colSpan: 14, rowSpan: 6, text: "Then drop another note somewhere else on the same page. Overlap is allowed — the newest note sits on top.", ink: "#7c3aed" },
+      { col: 3, row: 18, colSpan: 38, rowSpan: 2, text: "When the page is full, press “+ New page” and keep writing.", ink: "#1f2937", fontSize: 15 }
+    ];
+    return raw.map(function (item, index) {
+      return {
+        id: uid(), col: item.col, row: item.row, colSpan: item.colSpan, rowSpan: item.rowSpan,
+        text: item.text, ink: item.ink || "#1f2937", fill: item.fill || "transparent",
+        fontSize: item.fontSize || 14, direction: item.direction || "horizontal",
+        align: item.align || "left", order: index
+      };
+    });
+  }
+
+  function seedState() {
+    var state = defaultState();
+    var page1 = { id: uid(), categoryId: "c1", title: "How this page works", position: 0, blocks: demoBlocks() };
+    var page2 = { id: uid(), categoryId: "c2", title: "Blank page", position: 1, blocks: [] };
+    state.pages = [page1, page2];
+    state.activePageId = page1.id;
+    return state;
+  }
+
+  /* ============================ state ============================ */
+  var state;
+  try {
+    var stored = window.localStorage.getItem(STORAGE_KEY);
+    state = stored ? JSON.parse(stored) : seedState();
+    if (!state || !Array.isArray(state.pages)) state = seedState();
+  } catch (error) {
+    state = seedState();
+  }
+  if (!state.pages.length) state.activePageId = null;
+  else if (!state.pages.some(function (p) { return p.id === state.activePageId; })) state.activePageId = state.pages[0].id;
+
+  var selectedId = null;
+  var areaEls = {};
+  var saveTimer = null;
+  var cell = BASE_CELL;
+
+  function activePage() {
+    for (var i = 0; i < state.pages.length; i++) if (state.pages[i].id === state.activePageId) return state.pages[i];
+    return null;
+  }
+  function findBlock(id) {
+    var page = activePage();
+    if (!page) return null;
+    for (var i = 0; i < page.blocks.length; i++) if (page.blocks[i].id === id) return page.blocks[i];
+    return null;
+  }
+  function nextPosition() {
+    var max = -1;
+    state.pages.forEach(function (p) { if (p.position > max) max = p.position; });
+    return max + 1;
+  }
+
+  /* ============================ persistence ============================ */
+  function setStatus(text, kind) {
+    var el = $("status");
+    el.textContent = text;
+    el.className = kind || "";
+  }
+  function save() {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      setStatus("Saved in this browser");
+    } catch (error) {
+      setStatus("Could not save — storage is full", "error");
+    }
+  }
+  function scheduleSave() {
+    setStatus("Saving…", "saving");
+    if (saveTimer) window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(save, 400);
+  }
+
+  /* ============================ cell sizing ============================ */
+  function measureCell() {
+    var width = $("scroll").clientWidth - 48;
+    var base = Math.floor(width / (GRID_COLS + 3));
+    base = clamp(base, 7, BASE_CELL);
+    cell = clamp(Math.round(base * state.ui.zoom * 2) / 2, 6, 30);
+    document.documentElement.style.setProperty("--cell", cell + "px");
+    $("sheet").style.width = "calc(var(--cell) * " + (GRID_COLS + 3) + ")";
+    $("grid").style.width = "calc(var(--cell) * " + GRID_COLS + ")";
+    $("grid").style.height = "calc(var(--cell) * " + GRID_ROWS + ")";
+    $("zoom-label").textContent = Math.round(state.ui.zoom * 100) + "%";
+  }
+
+  /* ============================ writing areas ============================ */
+  function styleArea(el, block) {
+    el.style.left = "calc(var(--cell) * " + block.col + ")";
+    el.style.top = "calc(var(--cell) * " + block.row + ")";
+    el.style.width = "calc(var(--cell) * " + block.colSpan + ")";
+    el.style.height = "calc(var(--cell) * " + block.rowSpan + ")";
+    el.style.zIndex = block.id === selectedId ? 30 : 10;
+    el.classList.toggle("selected", block.id === selectedId);
+
+    var ta = el.querySelector("textarea");
+    if (ta.value !== block.text) ta.value = block.text;
+    ta.style.color = block.ink;
+    ta.style.backgroundColor = block.fill === "transparent" ? "transparent" : block.fill;
+    ta.style.fontSize = "calc(var(--cell) * " + block.fontSize / 16 + ")";
+    ta.style.textAlign = block.align;
+    ta.style.writingMode = block.direction === "vertical" ? "vertical-rl" : "horizontal-tb";
+
+    var tools = el.querySelector(".tools");
+    tools.className = "tools " + (block.row < 4 ? "below" : "above");
+    var flip = tools.querySelector('[data-act="flip"]');
+    flip.textContent = block.direction === "horizontal" ? "⮐" : "⮑";
+    flip.title = block.direction === "horizontal" ? "Switch to vertical writing" : "Switch to horizontal writing";
+  }
+
+  function makeArea(block) {
+    var el = document.createElement("div");
+    el.className = "area";
+    el.dataset.id = block.id;
+    el.innerHTML =
+      '<div class="ring"></div>' +
+      '<div class="tools">' +
+        '<button type="button" data-act="move" title="Move (or drag the note itself)">✥</button>' +
+        '<button type="button" data-act="narrow" title="Narrower">−W</button>' +
+        '<button type="button" data-act="widen" title="Wider">+W</button>' +
+        '<button type="button" data-act="shorter" title="Shorter">−H</button>' +
+        '<button type="button" data-act="taller" title="Taller">+H</button>' +
+        '<span class="sep"></span>' +
+        '<button type="button" data-act="flip" title="Switch writing direction">⮐</button>' +
+        '<button type="button" data-act="delete" title="Delete writing area">🗑</button>' +
+      '</div>' +
+      '<textarea spellcheck="false" aria-label="Writing area"></textarea>' +
+      '<div class="grip" data-act="resize" title="Drag to resize"></div>';
+    el.addEventListener("pointerdown", function (event) {
+      var action = event.target.closest("[data-act]");
+      if (action) {
+        event.stopPropagation();
+        event.preventDefault();
+        handleTool(action.dataset.act, block.id, event);
+        return;
+      }
+      select(block.id);
+    });
+    var ta = el.querySelector("textarea");
+    ta.addEventListener("input", function () {
+      block.text = ta.value;
+      growToFit(el, ta, block);
+      scheduleSave();
+    });
+    ta.addEventListener("focus", function () { select(block.id); });
+    ta.addEventListener("blur", function () { if (!block.text.trim()) removeArea(block.id); });
+    ta.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") ta.blur();
+    });
+    areaEls[block.id] = el;
+    styleArea(el, block);
+    $("grid").appendChild(el);
+    return el;
+  }
+
+  function growToFit(el, ta, block) {
+    if (block.direction === "vertical") return;
+    var lineHeight = cell * (block.fontSize / 16) * 1.55;
+    var overflow = ta.scrollHeight - ta.clientHeight;
+    if (overflow > 2 && lineHeight > 4) {
+      var extra = Math.max(1, Math.ceil(overflow / lineHeight));
+      block.rowSpan = clamp(block.rowSpan + extra, 1, GRID_ROWS - block.row);
+      styleArea(el, block);
+    }
+  }
+
+  function removeArea(id) {
+    var page = activePage();
+    if (!page) return;
+    page.blocks = page.blocks.filter(function (b) { return b.id !== id; });
+    var el = areaEls[id];
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    delete areaEls[id];
+    if (selectedId === id) selectedId = null;
+    renderChrome();
+    scheduleSave();
+  }
+
+  function addArea(rect) {
+    var page = activePage();
+    if (!page) return;
+    var col = clamp(rect.col, 0, GRID_COLS - 1);
+    var row = clamp(rect.row, 0, GRID_ROWS - 1);
+    var colSpan = clamp(rect.colSpan, 1, GRID_COLS - col);
+    var rowSpan = clamp(rect.rowSpan, 1, GRID_ROWS - row);
+    var direction = colSpan === 1 ? "vertical" : rowSpan === 1 ? "horizontal" : state.ui.direction;
+    var block = {
+      id: uid(), col: col, row: row, colSpan: colSpan, rowSpan: rowSpan,
+      text: "", ink: state.ui.ink, fill: state.ui.fill, fontSize: state.ui.fontSize,
+      direction: direction, align: state.ui.align, order: page.blocks.length
+    };
+    page.blocks.push(block);
+    var el = makeArea(block);
+    select(block.id);
+    var ta = el.querySelector("textarea");
+    ta.focus();
+    renderChrome();
+    scheduleSave();
+  }
+
+  function patchBlock(id, patch) {
+    var block = findBlock(id);
+    if (!block) return;
+    for (var key in patch) if (Object.prototype.hasOwnProperty.call(patch, key)) block[key] = patch[key];
+    block.colSpan = clamp(block.colSpan, 1, GRID_COLS - block.col);
+    block.rowSpan = clamp(block.rowSpan, 1, GRID_ROWS - block.row);
+    block.col = clamp(block.col, 0, GRID_COLS - block.colSpan);
+    block.row = clamp(block.row, 0, GRID_ROWS - block.rowSpan);
+    var el = areaEls[id];
+    if (el) styleArea(el, block);
+    renderChrome();
+    scheduleSave();
+  }
+
+  function select(id) {
+    if (selectedId === id) return;
+    var previous = selectedId;
+    selectedId = id;
+    if (previous && areaEls[previous]) styleArea(areaEls[previous], findBlock(previous) || { id: previous, col: 0, row: 0, colSpan: 1, rowSpan: 1, direction: "horizontal", align: "left" });
+    var block = findBlock(id);
+    if (block && areaEls[id]) styleArea(areaEls[id], block);
+    renderChrome();
+  }
+
+  function handleTool(action, id, event) {
+    var block = findBlock(id);
+    if (!block) return;
+    if (action === "delete") { removeArea(id); return; }
+    if (action === "flip") {
+      var vertical = block.direction !== "vertical";
+      patchBlock(id, {
+        direction: vertical ? "vertical" : "horizontal",
+        colSpan: vertical ? clamp(Math.round(block.rowSpan / 2) || 1, 1, GRID_COLS - block.col) : block.rowSpan,
+        rowSpan: vertical ? block.colSpan : clamp(Math.max(2, block.colSpan * 2), 1, GRID_ROWS - block.row)
+      });
+      return;
+    }
+    if (action === "move") { startMove(id, event); return; }
+    if (action === "resize") { startResize(id, event); return; }
+    var map = {
+      narrow: { colSpan: block.colSpan - 1 },
+      widen: { colSpan: block.colSpan + 1 },
+      shorter: { rowSpan: block.rowSpan - 1 },
+      taller: { rowSpan: block.rowSpan + 1 }
+    };
+    if (map[action]) patchBlock(id, map[action]);
+  }
+
+  /* ============================ dragging ============================ */
+  var drag = null;
+
+  function cellFromPoint(clientX, clientY) {
+    var box = $("grid").getBoundingClientRect();
+    return {
+      col: clamp(Math.floor((clientX - box.left) / cell), 0, GRID_COLS - 1),
+      row: clamp(Math.floor((clientY - box.top) / cell), 0, GRID_ROWS - 1)
+    };
+  }
+
+  function capture(target, event) {
+    if (!target || typeof target.setPointerCapture !== "function") return;
+    try { target.setPointerCapture(event.pointerId); } catch (error) { /* ignore */ }
+  }
+
+  function rectFromPoints(a, b) {
+    return {
+      col: Math.min(a.col, b.col),
+      row: Math.min(a.row, b.row),
+      colSpan: Math.abs(a.col - b.col) + 1,
+      rowSpan: Math.abs(a.row - b.row) + 1
+    };
+  }
+
+  function showMarquee(rect) {
+    var m = $("marquee"), label = $("marquee-label");
+    m.style.display = "block";
+    m.style.left = "calc(var(--cell) * " + rect.col + ")";
+    m.style.top = "calc(var(--cell) * " + rect.row + ")";
+    m.style.width = "calc(var(--cell) * " + rect.colSpan + ")";
+    m.style.height = "calc(var(--cell) * " + rect.rowSpan + ")";
+    label.style.display = "block";
+    label.style.left = m.style.left;
+    label.style.top = "calc(var(--cell) * " + rect.row + " - 2px)";
+    label.textContent = rect.colSpan + " × " + rect.rowSpan + " squares · " +
+      (rect.colSpan >= rect.rowSpan ? "horizontal" : "vertical");
+  }
+  function hideMarquee() {
+    $("marquee").style.display = "none";
+    $("marquee-label").style.display = "none";
+  }
+
+  function startMove(id, event) {
+    var block = findBlock(id);
+    if (!block) return;
+    var point = cellFromPoint(event.clientX, event.clientY);
+    drag = { kind: "move", id: id, startCol: block.col, startRow: block.row, grabCol: point.col, grabRow: point.row, colSpan: block.colSpan, rowSpan: block.rowSpan };
+    capture($("grid"), event);
+  }
+
+  function startResize(id, event) {
+    var block = findBlock(id);
+    if (!block) return;
+    drag = { kind: "resize", id: id, col: block.col, row: block.row };
+    capture($("grid"), event);
+  }
+
+  function onPointerMove(event) {
+    if (!drag) return;
+    var point = cellFromPoint(event.clientX, event.clientY);
+    if (drag.kind === "draw") {
+      if (point.col !== drag.startCol || point.row !== drag.startRow) drag.moved = true;
+      showMarquee(rectFromPoints({ col: drag.startCol, row: drag.startRow }, point));
+      return;
+    }
+    var block = findBlock(drag.id);
+    if (!block) return;
+    if (drag.kind === "resize") {
+      patchBlock(drag.id, {
+        colSpan: clamp(point.col - block.col + 1, 1, GRID_COLS - block.col),
+        rowSpan: clamp(point.row - block.row + 1, 1, GRID_ROWS - block.row)
+      });
+      return;
+    }
+    patchBlock(drag.id, {
+      col: clamp(drag.startCol + (point.col - drag.grabCol), 0, GRID_COLS - drag.colSpan),
+      row: clamp(drag.startRow + (point.row - drag.grabRow), 0, GRID_ROWS - drag.rowSpan)
+    });
+  }
+
+  function onPointerUp(event) {
+    if (!drag) return;
+    var current = drag;
+    drag = null;
+    if (current.kind !== "draw") return;
+    var point = cellFromPoint(event.clientX, event.clientY);
+    hideMarquee();
+    var rect = current.moved
+      ? rectFromPoints({ col: current.startCol, row: current.startRow }, point)
+      : (state.ui.direction === "vertical"
+          ? { col: current.startCol, row: current.startRow, colSpan: 2, rowSpan: Math.min(10, GRID_ROWS - current.startRow) }
+          : { col: current.startCol, row: current.startRow, colSpan: Math.min(14, GRID_COLS - current.startCol), rowSpan: 2 });
+    addArea(rect);
+  }
+
+  $("grid").addEventListener("pointerdown", function (event) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    var overArea = event.target.closest(".area");
+    if (overArea && !(event.altKey || event.ctrlKey)) return;
+    if (overArea) event.preventDefault();
+    var point = cellFromPoint(event.clientX, event.clientY);
+    drag = { kind: "draw", startCol: point.col, startRow: point.row, moved: false };
+    showMarquee({ col: point.col, row: point.row, colSpan: 1, rowSpan: 1 });
+    capture($("grid"), event);
+  });
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("pointercancel", function () { drag = null; hideMarquee(); });
+  window.addEventListener("blur", function () { drag = null; hideMarquee(); });
+
+  /* ============================ rendering ============================ */
+  function renderAreas() {
+    Object.keys(areaEls).forEach(function (id) {
+      var el = areaEls[id];
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+    areaEls = {};
+    hideMarquee();
+    var page = activePage();
+    if (!page) return;
+    page.blocks.forEach(function (block) { makeArea(block); });
+    if (selectedId && !findBlock(selectedId)) selectedId = null;
+  }
+
+  function renderSidebar() {
+    var body = $("sb-body");
+    var query = $("search").value.trim().toLowerCase();
+
+    if (query) {
+      var hits = [];
+      state.pages.forEach(function (page) {
+        if (page.title.toLowerCase().indexOf(query) !== -1) {
+          hits.push({ pageId: page.id, title: page.title, snippet: "page title" });
+        }
+        page.blocks.forEach(function (block) {
+          if (block.text.toLowerCase().indexOf(query) !== -1) {
+            var clean = block.text.replace(/\s+/g, " ").trim();
+            var at = clean.toLowerCase().indexOf(query);
+            var start = Math.max(0, at - 24);
+            hits.push({
+              pageId: page.id,
+              title: page.title,
+              snippet: (start > 0 ? "…" : "") + clean.slice(start, start + 70) + (clean.length > start + 70 ? "…" : "")
+            });
+          }
+        });
+      });
+      hits = hits.slice(0, 24);
+      body.innerHTML =
+        '<div class="sb-h">' + hits.length + ' match' + (hits.length === 1 ? "" : "es") + "</div>" +
+        (hits.length
+          ? '<ul class="page-list">' + hits.map(function (hit) {
+              return '<li><button class="page-btn" data-goto="' + hit.pageId + '"><span class="label"><b>' +
+                escapeHtml(hit.title) + '</b><span>' + escapeHtml(hit.snippet) + "</span></span></button></li>";
+            }).join("") + "</ul>"
+          : '<p class="hint" style="padding:0 4px">Nothing found.</p>');
+      return;
+    }
+
+    var groups = state.categories.map(function (category) {
+      return { key: category.id, label: category.name, color: category.color, pages: [] };
+    });
+    groups.push({ key: "", label: "Unfiled", color: "#94a3b8", pages: [] });
+    state.pages.forEach(function (page) {
+      var group = groups.filter(function (g) { return g.key === (page.categoryId || ""); })[0] || groups[groups.length - 1];
+      group.pages.push(page);
+    });
+
+    var html = groups.map(function (group) {
+      if (group.key === "" && !group.pages.length) return "";
+      return '<div class="group">' +
+        '<div class="group-head"><span class="dot" style="background:' + group.color + '"></span>' +
+        '<span class="group-name">' + escapeHtml(group.label) + "</span>" +
+        '<span class="group-count">' + group.pages.length + "</span>" +
+        (group.key ? '<button class="group-add" data-add-in="' + group.key + '" title="New page in this section">+</button>' : "") +
+        "</div>" +
+        '<ul class="page-list">' + group.pages.map(function (page) {
+          return '<li><button class="page-btn' + (page.id === state.activePageId ? " active" : "") + '" data-goto="' + page.id + '">' +
+            '<span aria-hidden="true" style="opacity:.6;font-size:10px">▦</span>' +
+            '<span class="label"><b>' + escapeHtml(page.title || "Untitled page") + "</b><span>" +
+            page.blocks.length + " writing area" + (page.blocks.length === 1 ? "" : "s") + "</span></span></button>" +
+            '<button class="page-del" data-del-page="' + page.id + '" title="Delete page">✕</button></li>';
+        }).join("") + "</ul></div>";
+    }).join("");
+
+    html += '<div class="sb-sections"><div class="sb-h">Sections</div>' +
+      state.categories.map(function (category) {
+        return '<div class="cat-row"><span class="dot" style="background:' + category.color + '"></span>' +
+          '<button class="cat-name" data-rename="' + category.id + '" title="Double-click to rename">' + escapeHtml(category.name) + "</button>" +
+          '<span class="cat-actions">' +
+          '<button class="mini" data-add-in="' + category.id + '" title="New page here">+</button>' +
+          '<button class="mini danger" data-del-cat="' + category.id + '" title="Delete section">✕</button>' +
+          "</span></div>";
+      }).join("") +
+      '<form class="add-form" id="add-cat-form"><input id="new-cat" placeholder="New section…" aria-label="New section name" />' +
+      "<button type=\"submit\">Add</button></form></div>";
+
+    body.innerHTML = html;
+  }
+
+  function renderChrome() {
+    var page = activePage();
+    var index = state.pages.indexOf(page);
+    var block = findBlock(selectedId);
+
+    $("title-input").value = page ? page.title : "";
+    $("page-indicator").textContent = (index < 0 ? 0 : index + 1) + " / " + state.pages.length;
+
+    var select = $("category-select");
+    select.innerHTML = '<option value="">Unfiled</option>' + state.categories.map(function (category) {
+      return '<option value="' + category.id + '"' + (page && page.categoryId === category.id ? " selected" : "") + ">" +
+        escapeHtml(category.name) + "</option>";
+    }).join("");
+
+    $("ink-swatches").innerHTML = INK_COLORS.map(function (color) {
+      var active = (block ? block.ink : state.ui.ink) === color;
+      return '<button class="swatch" data-ink="' + color + '" aria-pressed="' + active + '" title="Ink ' + color + '" style="background:' + color + '"></button>';
+    }).join("");
+    $("fill-swatches").innerHTML = FILL_COLORS.map(function (color) {
+      var active = (block ? block.fill : state.ui.fill) === color;
+      var background = color === "transparent"
+        ? "background:#fff;background-image:linear-gradient(45deg, transparent 45%, #f43f5e 45%, #f43f5e 55%, transparent 55%)"
+        : "background:" + color;
+      return '<button class="swatch" data-fill="' + color + '" aria-pressed="' + active + '" title="Fill ' + color + '" style="' + background + '"></button>';
+    }).join("");
+    $("font-value").textContent = block ? block.fontSize : state.ui.fontSize;
+
+    $("align-seg").innerHTML = ALIGNS.map(function (item) {
+      var active = (block ? block.align : state.ui.align) === item[0];
+      return '<button data-align="' + item[0] + '" aria-pressed="' + active + '" title="' + item[2] + '">' + item[1] + "</button>";
+    }).join("");
+
+    var direction = block ? block.direction : state.ui.direction;
+    $("flip-dir").textContent = direction === "horizontal" ? "Horizontal → Vertical" : "Vertical → Horizontal";
+    $("dup-btn").disabled = !block;
+    $("del-btn").disabled = !block;
+
+    $("grid").classList.toggle("grid-on", state.ui.showGrid);
+    $("grid-toggle").textContent = state.ui.showGrid ? "Hide grid" : "Show grid";
+    $("sheet-info").textContent = page
+      ? GRID_COLS + " × " + GRID_ROWS + " squares · cell " + cell + "px · " + page.blocks.length + " writing area" + (page.blocks.length === 1 ? "" : "s")
+      : "No page selected";
+    $("foot-note").textContent = block
+      ? "Selected: " + block.colSpan + " × " + block.rowSpan + " squares at column " + (block.col + 1) + ", row " + (block.row + 1)
+      : "";
+
+    renderSidebar();
+  }
+
+  function renderAll() {
+    renderAreas();
+    measureCell();
+    renderChrome();
+  }
+
+  /* ============================ pages & sections ============================ */
+  function openPage(id) {
+    if (state.activePageId === id) return;
+    state.activePageId = id;
+    selectedId = null;
+    renderAll();
+    save();
+    closeSidebar();
+  }
+
+  function addPage(categoryId) {
+    var page = {
+      id: uid(),
+      categoryId: categoryId || null,
+      title: "Page " + (nextPosition() + 1),
+      position: nextPosition(),
+      blocks: []
+    };
+    state.pages.push(page);
+    openPage(page.id);
+  }
+
+  function deletePage(id) {
+    var page = state.pages.filter(function (p) { return p.id === id; })[0];
+    if (!page) return;
+    if (!window.confirm('Delete "' + (page.title || "Untitled page") + '" and everything on it?')) return;
+    state.pages = state.pages.filter(function (p) { return p.id !== id; });
+    if (state.activePageId === id) {
+      var fallback = state.pages[0] || null;
+      state.activePageId = fallback ? fallback.id : null;
+      selectedId = null;
+    }
+    renderAll();
+    save();
+  }
+
+  function addCategory(name) {
+    var category = { id: uid(), name: name, color: CATEGORY_PALETTE[state.categories.length % CATEGORY_PALETTE.length] };
+    state.categories.push(category);
+    renderChrome();
+    save();
+  }
+
+  function renameCategory(id, name) {
+    var category = state.categories.filter(function (c) { return c.id === id; })[0];
+    if (!category || !name) return;
+    category.name = name;
+    renderChrome();
+    save();
+  }
+
+  function deleteCategory(id) {
+    var category = state.categories.filter(function (c) { return c.id === id; })[0];
+    if (!category) return;
+    if (!window.confirm('Delete section "' + category.name + '"? Its pages stay, unfiled.')) return;
+    state.categories = state.categories.filter(function (c) { return c.id !== id; });
+    state.pages.forEach(function (page) { if (page.categoryId === id) page.categoryId = null; });
+    renderAll();
+    save();
+  }
+
+  function clearPage() {
+    var page = activePage();
+    if (!page || !page.blocks.length) return;
+    if (!window.confirm("Erase every writing area on this page?")) return;
+    page.blocks = [];
+    selectedId = null;
+    renderAll();
+    save();
+  }
+
+  /* ============================ backup ============================ */
+  function exportJson() {
+    var blob = new Blob([JSON.stringify({ version: 1, app: "grid-notes", exportedAt: new Date().toISOString(), state: state }, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = "grid-notes-backup.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    setStatus("Backup downloaded");
+  }
+
+  function importJson(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var parsed = JSON.parse(String(reader.result));
+        var incoming = parsed && parsed.state ? parsed.state : parsed;
+        if (!incoming || !Array.isArray(incoming.pages) || !Array.isArray(incoming.categories)) {
+          throw new Error("Not a Grid Notes backup");
+        }
+        incoming.pages.forEach(function (page) {
+          page.id = page.id || uid();
+          page.position = typeof page.position === "number" ? page.position : 0;
+          page.blocks = Array.isArray(page.blocks) ? page.blocks : [];
+          page.blocks.forEach(function (block) {
+            block.id = block.id || uid();
+            block.col = clamp(Number(block.col) || 0, 0, GRID_COLS - 1);
+            block.row = clamp(Number(block.row) || 0, 0, GRID_ROWS - 1);
+            block.colSpan = clamp(Number(block.colSpan) || 1, 1, GRID_COLS);
+            block.rowSpan = clamp(Number(block.rowSpan) || 1, 1, GRID_ROWS);
+            block.text = typeof block.text === "string" ? block.text : "";
+            block.ink = typeof block.ink === "string" ? block.ink : "#1f2937";
+            block.fill = typeof block.fill === "string" ? block.fill : "transparent";
+            block.fontSize = clamp(Number(block.fontSize) || 14, 8, 30);
+            block.direction = block.direction === "vertical" ? "vertical" : "horizontal";
+            block.align = ["left", "center", "right"].indexOf(block.align) === -1 ? "left" : block.align;
+          });
+        });
+        state.categories = incoming.categories;
+        state.pages = incoming.pages;
+        state.activePageId = state.pages[0] ? state.pages[0].id : null;
+        selectedId = null;
+        renderAll();
+        save();
+        setStatus("Backup restored");
+      } catch (error) {
+        window.alert("That file could not be read as a Grid Notes backup.\n\n" + error.message);
+        setStatus("Import failed", "error");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  /* ============================ events ============================ */
+  function closeSidebar() {
+    $("sidebar").classList.remove("open");
+    $("scrim").classList.remove("show");
+  }
+
+  $("menu-btn").addEventListener("click", function () {
+    $("sidebar").classList.add("open");
+    $("scrim").classList.add("show");
+  });
+  $("close-sb").addEventListener("click", closeSidebar);
+  $("scrim").addEventListener("click", closeSidebar);
+
+  $("new-page").addEventListener("click", function () {
+    addPage((state.categories[0] || {}).id || null);
+  });
+
+  $("title-input").addEventListener("input", function () {
+    var page = activePage();
+    if (!page) return;
+    page.title = $("title-input").value;
+    renderSidebar();
+    scheduleSave();
+  });
+
+  $("category-select").addEventListener("change", function () {
+    var page = activePage();
+    if (!page) return;
+    page.categoryId = $("category-select").value || null;
+    renderSidebar();
+    scheduleSave();
+  });
+
+  $("prev-page").addEventListener("click", function () {
+    if (!state.pages.length) return;
+    var index = state.pages.indexOf(activePage());
+    var target = state.pages[index - 1] || state.pages[state.pages.length - 1];
+    openPage(target.id);
+  });
+  $("next-page").addEventListener("click", function () {
+    if (!state.pages.length) return;
+    var index = state.pages.indexOf(activePage());
+    var target = state.pages[index + 1] || state.pages[0];
+    openPage(target.id);
+  });
+
+  $("pen-row").addEventListener("mousedown", function (event) { event.preventDefault(); });
+  $("pen-row").addEventListener("click", function (event) {
+    var ink = event.target.closest("[data-ink]");
+    if (ink) { applyStyle({ ink: ink.dataset.ink }); return; }
+    var fill = event.target.closest("[data-fill]");
+    if (fill) { applyStyle({ fill: fill.dataset.fill }); return; }
+    var align = event.target.closest("[data-align]");
+    if (align) { applyStyle({ align: align.dataset.align }); return; }
+  });
+
+  function applyStyle(patch) {
+    var block = findBlock(selectedId);
+    if (block) {
+      patchBlock(selectedId, patch);
+      var ta = areaEls[selectedId] && areaEls[selectedId].querySelector("textarea");
+      if (ta) ta.focus();
+    } else {
+      for (var key in patch) if (Object.prototype.hasOwnProperty.call(patch, key)) state.ui[key] = patch[key];
+      renderChrome();
+      scheduleSave();
+    }
+  }
+
+  function stepFont(delta) {
+    var block = findBlock(selectedId);
+    var base = block ? block.fontSize : state.ui.fontSize;
+    applyStyle({ fontSize: clamp(base + delta, 8, 30) });
+  }
+  $("font-up").addEventListener("click", function () { stepFont(1); });
+  $("font-down").addEventListener("click", function () { stepFont(-1); });
+
+  $("flip-dir").addEventListener("click", function () {
+    var block = findBlock(selectedId);
+    var direction = block ? block.direction : state.ui.direction;
+    var next = direction === "horizontal" ? "vertical" : "horizontal";
+    if (block) patchBlock(selectedId, { direction: next });
+    else { state.ui.direction = next; renderChrome(); scheduleSave(); }
+  });
+
+  $("dup-btn").addEventListener("click", function () {
+    var page = activePage();
+    var block = findBlock(selectedId);
+    if (!page || !block) return;
+    var copy = {};
+    for (var key in block) if (Object.prototype.hasOwnProperty.call(block, key)) copy[key] = block[key];
+    copy.id = uid();
+    copy.row = clamp(block.row + block.rowSpan, 0, GRID_ROWS - block.rowSpan);
+    copy.order = page.blocks.length;
+    page.blocks.push(copy);
+    var el = makeArea(copy);
+    select(copy.id);
+    el.querySelector("textarea").focus();
+    renderChrome();
+    scheduleSave();
+  });
+
+  $("del-btn").addEventListener("click", function () { if (selectedId) removeArea(selectedId); });
+  $("clear-btn").addEventListener("click", clearPage);
+  $("print-btn").addEventListener("click", function () { window.print(); });
+  $("export-btn").addEventListener("click", exportJson);
+  $("import-btn").addEventListener("click", function () { $("import-file").click(); });
+  $("import-file").addEventListener("change", function (event) {
+    var file = event.target.files && event.target.files[0];
+    if (file) importJson(file);
+    event.target.value = "";
+  });
+
+  $("grid-toggle").addEventListener("click", function () {
+    state.ui.showGrid = !state.ui.showGrid;
+    renderChrome();
+    save();
+  });
+  $("zoom-in").addEventListener("click", function () { state.ui.zoom = clamp(state.ui.zoom + 0.15, 0.55, 1.8); measureCell(); });
+  $("zoom-out").addEventListener("click", function () { state.ui.zoom = clamp(state.ui.zoom - 0.15, 0.55, 1.8); measureCell(); });
+
+  $("tip-close").addEventListener("click", function () { $("tip").style.display = "none"; });
+
+  $("sb-body").addEventListener("click", function (event) {
+    var goto = event.target.closest("[data-goto]");
+    if (goto) { openPage(goto.dataset.goto); return; }
+    var delPage = event.target.closest("[data-del-page]");
+    if (delPage) { deletePage(delPage.dataset.delPage); return; }
+    var delCat = event.target.closest("[data-del-cat]");
+    if (delCat) { deleteCategory(delCat.dataset.delCat); return; }
+    var addIn = event.target.closest("[data-add-in]");
+    if (addIn) { addPage(addIn.dataset.addIn); return; }
+    var rename = event.target.closest("[data-rename]");
+    if (rename) {
+      var category = state.categories.filter(function (c) { return c.id === rename.dataset.rename; })[0];
+      if (category) {
+        var name = window.prompt("Rename section", category.name);
+        if (name) renameCategory(category.id, name.trim());
+      }
+    }
+  });
+  $("sb-body").addEventListener("dblclick", function (event) {
+    var rename = event.target.closest("[data-rename]");
+    if (rename) {
+      var category = state.categories.filter(function (c) { return c.id === rename.dataset.rename; })[0];
+      if (category) {
+        var name = window.prompt("Rename section", category.name);
+        if (name) renameCategory(category.id, name.trim());
+      }
+    }
+  });
+  $("sb-body").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var input = $("new-cat");
+    var value = input.value.trim();
+    if (value) { addCategory(value); input.value = ""; }
+  });
+
+  $("search").addEventListener("input", renderSidebar);
+
+  document.addEventListener("keydown", function (event) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      save();
+      return;
+    }
+    if (event.key === "Escape") {
+      if (selectedId) { selectedId = null; renderAreas(); renderChrome(); }
+      closeSidebar();
+      return;
+    }
+    var tag = event.target && event.target.tagName;
+    var typing = tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT";
+    if ((event.key === "Delete" || event.key === "Backspace") && !typing && selectedId) {
+      event.preventDefault();
+      removeArea(selectedId);
+    }
+  });
+
+  window.addEventListener("resize", measureCell);
+  window.addEventListener("beforeunload", function () { if (saveTimer) save(); });
+  if (typeof window.ResizeObserver === "function") {
+    new window.ResizeObserver(measureCell).observe($("scroll"));
+  }
+
+  /* ============================ boot ============================ */
+  renderAll();
+  // Write immediately so a first visit is persisted even if nothing is edited.
+  save();
+})();
+</script>
+</body>
+</html>
